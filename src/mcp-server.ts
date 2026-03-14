@@ -426,14 +426,15 @@ class MCPServer {
 
   private async handleSimpleCall(args: any): Promise<{ content: any[] }> {
     const { phone_number, brief, caller_name, config_path, duration, recording, voice } = args;
+    const normalizedPhoneNumber = String(phone_number || '').replace(/\s+/g, '');
 
     // Validate required parameters
-    if (!phone_number || !brief || !caller_name) {
+    if (!normalizedPhoneNumber || !brief || !caller_name) {
       throw new Error("Missing required parameters: phone_number, brief, and caller_name are required");
     }
 
     // Validate phone number format
-    if (!/^[\+\*#0-9]+$/.test(phone_number)) {
+    if (!/^[\+\*#0-9]+$/.test(normalizedPhoneNumber)) {
       throw new Error("Invalid phone number format. Use digits, +, *, or # characters (e.g., +1234567890, **621, #123)");
     }
 
@@ -447,7 +448,7 @@ class MCPServer {
     }
 
     const callOptions: CallOptions = {
-      number: phone_number,
+      number: normalizedPhoneNumber,
       brief,
       userName: caller_name,
       config: config_path || 'config.json',
@@ -505,9 +506,10 @@ class MCPServer {
       colors,
       timestamps
     } = args;
+    const normalizedPhoneNumber = String(phone_number || '').replace(/\s+/g, '');
 
     // Validate required parameters
-    if (!phone_number || !user_name || !goal) {
+    if (!normalizedPhoneNumber || !user_name || !goal) {
       throw new Error("Missing required parameters: phone_number, user_name, and goal are required");
     }
 
@@ -517,7 +519,7 @@ class MCPServer {
     }
 
     // Validate phone number format
-    if (!/^[\+\*#0-9]+$/.test(phone_number)) {
+    if (!/^[\+\*#0-9]+$/.test(normalizedPhoneNumber)) {
       throw new Error("Invalid phone number format. Use digits, +, *, or # characters (e.g., +1234567890, **621, #123)");
     }
 
@@ -550,7 +552,7 @@ class MCPServer {
     briefText += ` Calling on behalf of ${user_name}.`;
 
     const callOptions: CallOptions = {
-      number: phone_number,
+      number: normalizedPhoneNumber,
       brief: briefText,
       userName: user_name,
       config: config || config_path,
