@@ -1,4 +1,5 @@
 import { SIPProviderProfile } from '../types.js';
+import { getLogger } from '../logger.js';
 
 // Provider profiles based on real-world testing and documentation
 export const PROVIDER_PROFILES: Record<string, SIPProviderProfile> = {
@@ -118,13 +119,15 @@ export const PROVIDER_PROFILES: Record<string, SIPProviderProfile> = {
 export function getProviderProfile(providerId: string): SIPProviderProfile {
   const profile = PROVIDER_PROFILES[providerId];
   if (!profile) {
-    console.warn(`⚠️  Unknown provider '${providerId}', using generic profile`);
-    console.log(`💡 Available providers: ${Object.keys(PROVIDER_PROFILES).join(', ')}`);
+    const logger = getLogger();
+    logger.configLogs.warn(`Unknown provider '${providerId}', using generic profile`);
+    logger.configLogs.info(`Available providers: ${Object.keys(PROVIDER_PROFILES).join(', ')}`);
     return PROVIDER_PROFILES.generic;
   }
-  
-  console.log(`📋 Using provider profile: ${profile.name}`);
-  console.log(`📝 ${profile.description}`);
+
+  const logger = getLogger();
+  logger.configLogs.info(`Using provider profile: ${profile.name}`);
+  logger.configLogs.info(profile.description);
   return profile;
 }
 
@@ -140,7 +143,7 @@ export function detectProviderFromDomain(domain: string): string | null {
   
   for (const [provider, pattern] of Object.entries(patterns)) {
     if (pattern.test(domain)) {
-      console.log(`🔍 Auto-detected provider '${provider}' from domain '${domain}'`);
+      getLogger().configLogs.info(`Auto-detected provider '${provider}' from domain '${domain}'`);
       return provider;
     }
   }

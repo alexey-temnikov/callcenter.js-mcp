@@ -14,6 +14,7 @@ export interface LoggerConfig {
   enableColors?: boolean;
   enableTimestamp?: boolean;
   transcriptOnly?: boolean; // For quiet mode - only show conversation transcripts
+  forceStderr?: boolean; // For stdio protocol mode - keep logs off stdout
 }
 
 class VoIPLogger {
@@ -205,6 +206,9 @@ class VoIPLogger {
       transports: [
         new winston.transports.Console({
           silent: false,
+          stderrLevels: Object.keys(winstonLevels),
+          consoleWarnLevels: [],
+          forceConsole: config.forceStderr ? true : undefined,
         }),
       ],
     });

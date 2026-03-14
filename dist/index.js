@@ -47,7 +47,8 @@ export async function makeCall(options) {
             level: logLevel,
             enableColors: options.colors ?? true,
             enableTimestamp: options.timestamps ?? false,
-            transcriptOnly: logLevel === LogLevel.QUIET
+            transcriptOnly: logLevel === LogLevel.QUIET,
+            forceStderr: options.forceStderr ?? false
         });
         logger.info(`Starting AI voice agent call to ${options.number}...`, 'CONFIG');
         // Load configuration

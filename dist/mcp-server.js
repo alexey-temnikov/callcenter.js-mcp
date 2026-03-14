@@ -408,7 +408,10 @@ class MCPServer {
             duration,
             recording,
             voice: voice || 'auto',
-            logLevel: 'quiet'
+            logLevel: 'quiet',
+            colors: false,
+            timestamps: false,
+            forceStderr: true
         };
         try {
             const result = await makeCall(callOptions);
@@ -485,7 +488,8 @@ class MCPServer {
             voice: voice || 'auto',
             logLevel: log_level || 'quiet',
             colors,
-            timestamps
+            timestamps,
+            forceStderr: true
         };
         try {
             const result = await makeCall(callOptions);

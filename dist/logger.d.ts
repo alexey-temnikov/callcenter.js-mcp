@@ -12,6 +12,7 @@ export interface LoggerConfig {
     enableColors?: boolean;
     enableTimestamp?: boolean;
     transcriptOnly?: boolean;
+    forceStderr?: boolean;
 }
 declare class VoIPLogger {
     logger: winston.Logger;

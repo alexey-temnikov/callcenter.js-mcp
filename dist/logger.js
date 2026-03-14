@@ -169,6 +169,9 @@ class VoIPLogger {
             transports: [
                 new winston.transports.Console({
                     silent: false,
+                    stderrLevels: Object.keys(winstonLevels),
+                    consoleWarnLevels: [],
+                    forceConsole: config.forceStderr ? true : undefined,
                 }),
             ],
         });

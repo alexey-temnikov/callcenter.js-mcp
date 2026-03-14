@@ -29,6 +29,8 @@ export interface CallOptions {
     colors?: boolean;
     /** Enable timestamps in logs */
     timestamps?: boolean;
+    /** Route all runtime logs to stderr to protect stdout protocols like MCP stdio */
+    forceStderr?: boolean;
 }
 export interface CallResult {
     /** Call ID if successful */

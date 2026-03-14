@@ -46,6 +46,9 @@ export interface CallOptions {
   
   /** Enable timestamps in logs */
   timestamps?: boolean;
+
+  /** Route all runtime logs to stderr to protect stdout protocols like MCP stdio */
+  forceStderr?: boolean;
 }
 
 export interface CallResult {
@@ -105,7 +108,8 @@ export async function makeCall(options: CallOptions): Promise<CallResult> {
       level: logLevel,
       enableColors: options.colors ?? true,
       enableTimestamp: options.timestamps ?? false,
-      transcriptOnly: logLevel === LogLevel.QUIET
+      transcriptOnly: logLevel === LogLevel.QUIET,
+      forceStderr: options.forceStderr ?? false
     });
 
     logger.info(`Starting AI voice agent call to ${options.number}...`, 'CONFIG');

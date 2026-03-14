@@ -454,7 +454,10 @@ class MCPServer {
       duration,
       recording,
       voice: voice || 'auto',
-      logLevel: 'quiet'
+      logLevel: 'quiet',
+      colors: false,
+      timestamps: false,
+      forceStderr: true
     };
 
     try {
@@ -556,7 +559,8 @@ class MCPServer {
       voice: voice || 'auto',
       logLevel: log_level || 'quiet',
       colors,
-      timestamps
+      timestamps,
+      forceStderr: true
     };
 
     try {
