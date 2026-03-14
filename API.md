@@ -509,8 +509,9 @@ const result = await makeCall({
 ```
 
 The recording will have:
-- **Left channel**: Caller audio (person being called)
-- **Right channel**: AI assistant audio
+- **Left channel**: Caller-dominant mix
+- **Right channel**: AI-assistant-dominant mix
+- **Both channels**: Both voices remain audible for normal playback on mono or single-sided output devices
 
 ### Transcript Capture
 

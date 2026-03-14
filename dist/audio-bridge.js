@@ -979,6 +979,7 @@ class RealTimeStereoRecorder {
     SAMPLE_RATE = 24000;
     FRAME_MS = 20;
     FRAME_SAMPLES = (this.SAMPLE_RATE / 1000) * this.FRAME_MS; // 480
+    CROSSFEED_GAIN = 0.35;
     timer = null;
     pausedForBackpressure = false;
     // Per-channel queues of Int16Array chunks
@@ -1052,11 +1053,22 @@ class RealTimeStereoRecorder {
         const right = this.aiQueue.pull(this.FRAME_SAMPLES);
         const stereo = new Int16Array(this.FRAME_SAMPLES * 2);
         for (let i = 0; i < this.FRAME_SAMPLES; i++) {
-            stereo[i * 2] = left[i] || 0; // Left channel: caller
-            stereo[i * 2 + 1] = right[i] || 0; // Right channel: AI
+            const callerSample = left[i] || 0;
+            const aiSample = right[i] || 0;
+            // Keep each participant dominant on their side while making both audible
+            // in mono playback or players that effectively emphasize a single channel.
+            stereo[i * 2] = this.clamp16(callerSample + aiSample * this.CROSSFEED_GAIN);
+            stereo[i * 2 + 1] = this.clamp16(aiSample + callerSample * this.CROSSFEED_GAIN);
         }
         const audioBuffer = Buffer.from(stereo.buffer, stereo.byteOffset, stereo.byteLength);
         return this.wavWriter.write(audioBuffer);
+    }
+    clamp16(sample) {
+        if (sample > 32767)
+            return 32767;
+        if (sample < -32768)
+            return -32768;
+        return Math.round(sample);
     }
 }
 /**

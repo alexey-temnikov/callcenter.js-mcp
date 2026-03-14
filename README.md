@@ -149,7 +149,7 @@ Your MCP Client will automatically handle the entire conversation using the AI V
 - 🔌 **MCP Server**: Integrate with MCP clients like Claude Code
 - 📚 **TypeScript API**: Programmatic library for building voice applications
 - 📝 **Call Brief Processing**: Natural language call instructions using o3-mini model with structured JSON output
-- 🎵 **Optional Call Recording**: Stereo WAV recording with caller/AI separation
+- 🎵 **Optional Call Recording**: Stereo WAV recording with caller/AI side emphasis and both voices audible on either channel
 
 ## 🚀 Quick Start
 
