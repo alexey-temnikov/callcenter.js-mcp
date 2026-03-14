@@ -185,6 +185,14 @@ m=audio ${this.localRtpPort} RTP/AVP ${payloadTypeString}`;
   getSelectedPayloadType(): number {
     return this.selectedPayloadType;
   }
+
+  getRemoteRtpIp(): string {
+    return this.remoteIp;
+  }
+
+  getRemoteRtpPort(): number {
+    return this.remoteRtpPort;
+  }
 }
 
 export class SIPClient {
@@ -643,6 +651,8 @@ export class SIPClient {
       this.currentSession.on("accepted", () => {
         getLogger().sip.info("Call accepted");
         const rtpPort = this.mediaHandler?.getRtpPort() || 5000;
+        const remoteRtpIp = this.mediaHandler?.getRemoteRtpIp();
+        const remoteRtpPort = this.mediaHandler?.getRemoteRtpPort();
         
         this.eventCallback({
           type: "CALL_ANSWERED",
@@ -650,6 +660,8 @@ export class SIPClient {
             session: this.currentSession,
             rtpPort: rtpPort,
             mediaHandler: this.mediaHandler,
+            remoteRtpIp,
+            remoteRtpPort,
             negotiatedPayloadType: this.mediaHandler?.getSelectedPayloadType() || 0,
           },
         });

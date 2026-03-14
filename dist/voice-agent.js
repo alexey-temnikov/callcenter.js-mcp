@@ -17,6 +17,7 @@ export class VoiceAgent extends EventEmitter {
     perfMonitor;
     enableCallRecording = true;
     aiEndCallReason = null;
+    initialResponseStarted = false;
     // Audio batching to reduce OpenAI SDK overhead
     audioBatch = [];
     BATCH_SIZE = 2; // Batch only 2 packets (20ms) to reduce latency
@@ -282,6 +283,9 @@ export class VoiceAgent extends EventEmitter {
             // Start RTP timeout detection for call termination
             this.audioBridge.startRtpDetection();
         }
+        else {
+            getLogger().rtp.debug("Call answered but remote RTP endpoint is not available yet");
+        }
         // Only do initial setup if this is the first CALL_ANSWERED event
         if (!this.isCallActive) {
             this.isCallActive = true;
@@ -304,10 +308,7 @@ export class VoiceAgent extends EventEmitter {
                 if (!this.openaiClient.isReady()) {
                     await this.openaiClient.connect();
                 }
-                setTimeout(() => {
-                    // Trigger initial response using configured instructions (no text input)
-                    this.openaiClient.createResponse();
-                }, 1000);
+                this.maybeStartInitialResponse();
             }
             catch (error) {
                 getLogger().sip.error("Error setting up call:", error);
@@ -317,6 +318,7 @@ export class VoiceAgent extends EventEmitter {
         else {
             getLogger().rtp.debug("Updating codec/RTP settings for active call");
         }
+        this.maybeStartInitialResponse();
     }
     parseSdpAndSetupAudio(sdp) {
         try {
@@ -344,6 +346,7 @@ export class VoiceAgent extends EventEmitter {
     async handleCallEnded(endedBy = 'local') {
         this.isCallActive = false;
         this.currentCallId = null;
+        this.initialResponseStarted = false;
         // Determine who really ended the call and why
         let endedByText;
         if (this.aiEndCallReason) {
@@ -405,6 +408,7 @@ export class VoiceAgent extends EventEmitter {
             throw new Error("Call already in progress");
         }
         getLogger().sip.debug(`Making call to ${callConfig.targetNumber}`);
+        this.initialResponseStarted = false;
         try {
             // Start AudioBridge first to get the actual RTP port
             if (!this.audioBridge.isRunning()) {
@@ -459,6 +463,34 @@ export class VoiceAgent extends EventEmitter {
             };
         }
         return baseStatus;
+    }
+    maybeStartInitialResponse() {
+        if (this.initialResponseStarted || !this.isCallActive) {
+            return;
+        }
+        if (!this.openaiClient.isReady()) {
+            getLogger().ai.debug("Deferring initial AI response until OpenAI connection is ready", "AI");
+            return;
+        }
+        if (!this.audioBridge.hasRemoteEndpoint()) {
+            getLogger().rtp.debug("Deferring initial AI response until remote RTP endpoint is configured");
+            return;
+        }
+        this.initialResponseStarted = true;
+        setTimeout(() => {
+            if (!this.isCallActive) {
+                this.initialResponseStarted = false;
+                return;
+            }
+            if (!this.openaiClient.isReady() || !this.audioBridge.hasRemoteEndpoint()) {
+                getLogger().rtp.debug("Initial AI response deferred again because the RTP path is not ready");
+                this.initialResponseStarted = false;
+                this.maybeStartInitialResponse();
+                return;
+            }
+            getLogger().ai.debug("Starting initial AI response after RTP path became ready", "AI");
+            this.openaiClient.createResponse();
+        }, 250);
     }
     async shutdown() {
         getLogger().info("Shutting down voice agent...", "CONFIG");

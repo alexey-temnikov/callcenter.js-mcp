@@ -825,6 +825,9 @@ export class AudioBridge extends EventEmitter {
     isRunning() {
         return this.isActive;
     }
+    hasRemoteEndpoint() {
+        return !!(this.config.remoteRtpHost && this.config.remoteRtpPort);
+    }
     setCallRecordingEnabled(enabled) {
         this.callRecordingEnabled = enabled;
         getLogger().audio.info(`Call recording ${enabled ? "enabled" : "disabled"}`);

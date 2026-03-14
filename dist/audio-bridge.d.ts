@@ -83,6 +83,7 @@ export declare class AudioBridge extends EventEmitter {
     clearAudioBuffer(): void;
     getLocalPort(): number;
     isRunning(): boolean;
+    hasRemoteEndpoint(): boolean;
     setCallRecordingEnabled(enabled: boolean): void;
     isCallRecordingEnabled(): boolean;
     private setupWavRecording;

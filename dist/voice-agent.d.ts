@@ -11,6 +11,7 @@ export declare class VoiceAgent extends EventEmitter {
     private perfMonitor;
     private enableCallRecording;
     private aiEndCallReason;
+    private initialResponseStarted;
     private audioBatch;
     private readonly BATCH_SIZE;
     private batchTimer;
@@ -34,6 +35,7 @@ export declare class VoiceAgent extends EventEmitter {
     makeCall(callConfig: CallConfig): Promise<void>;
     endCall(): Promise<void>;
     getStatus(): any;
+    private maybeStartInitialResponse;
     shutdown(): Promise<void>;
 }
 //# sourceMappingURL=voice-agent.d.ts.map
