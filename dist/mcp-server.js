@@ -385,7 +385,7 @@ class MCPServer {
     }
     async handleSimpleCall(args) {
         const { phone_number, brief, caller_name, config_path, duration, recording, voice } = args;
-        const normalizedPhoneNumber = typeof phone_number === 'string' ? phone_number.replace(/\s+/g, '') : phone_number;
+        const normalizedPhoneNumber = String(phone_number || '').replace(/\s+/g, '');
         // Validate required parameters
         if (!normalizedPhoneNumber || !brief || !caller_name) {
             throw new Error("Missing required parameters: phone_number, brief, and caller_name are required");
@@ -431,7 +431,7 @@ class MCPServer {
     }
     async handleAdvancedCall(args) {
         const { phone_number, user_name, target_name, goal, language, date, time, location, constraints, fallback_options, user_contact_return, budget, urgency, industry, jurisdiction, allow_persuasion_white_lies, requires_formality, voice, config, config_path, duration, recording, recording_filename, log_level, colors, timestamps } = args;
-        const normalizedPhoneNumber = typeof phone_number === 'string' ? phone_number.replace(/\s+/g, '') : phone_number;
+        const normalizedPhoneNumber = String(phone_number || '').replace(/\s+/g, '');
         // Validate required parameters
         if (!normalizedPhoneNumber || !user_name || !goal) {
             throw new Error("Missing required parameters: phone_number, user_name, and goal are required");

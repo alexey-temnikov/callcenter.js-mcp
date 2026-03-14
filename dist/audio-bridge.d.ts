@@ -88,5 +88,8 @@ export declare class AudioBridge extends EventEmitter {
     private setupWavRecording;
     private setupStereoCallRecording;
     private logPerformanceStats;
+    private resolveRecordingPath;
+    private buildRecordingPathCandidates;
+    private attachRecordingStreamErrorHandler;
 }
 //# sourceMappingURL=audio-bridge.d.ts.map

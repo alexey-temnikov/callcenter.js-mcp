@@ -1,6 +1,8 @@
 import { EventEmitter } from "events";
 import * as dgram from "dgram";
 import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 import { Writer } from "wav";
 import { AudioProcessor } from "./audio-processor.js";
 import { getCodec, Codec } from "./codecs/index.js";
@@ -1089,21 +1091,32 @@ export class AudioBridge extends EventEmitter {
       };
 
       // Create WAV files for debugging
-      const incomingFile = fs.createWriteStream(
+      const incomingPath = this.resolveRecordingPath(
         `incoming-audio-${timestamp}.wav`
       );
-      const outgoingFile = fs.createWriteStream(
+      const outgoingPath = this.resolveRecordingPath(
         `outgoing-audio-${timestamp}.wav`
       );
+      const incomingFile = fs.createWriteStream(incomingPath);
+      const outgoingFile = fs.createWriteStream(outgoingPath);
 
       this.incomingWavWriter = new Writer(wavOptions);
       this.outgoingWavWriter = new Writer(wavOptions);
+
+      this.attachRecordingStreamErrorHandler(incomingFile, "Incoming audio recording", () => {
+        this.incomingWavWriter?.end();
+        this.incomingWavWriter = null;
+      });
+      this.attachRecordingStreamErrorHandler(outgoingFile, "Outgoing audio recording", () => {
+        this.outgoingWavWriter?.end();
+        this.outgoingWavWriter = null;
+      });
 
       this.incomingWavWriter.pipe(incomingFile);
       this.outgoingWavWriter.pipe(outgoingFile);
 
       getLogger().audio.debug(
-        `Audio recording started: incoming-audio-${timestamp}.wav, outgoing-audio-${timestamp}.wav`
+        `Audio recording started: ${incomingPath}, ${outgoingPath}`
       );
     } catch (error) {
       getLogger().audio.error("Failed to setup WAV recording:", error);
@@ -1131,16 +1144,23 @@ export class AudioBridge extends EventEmitter {
         filename = `call-recording-${timestamp}.wav`;
       }
 
-      const callRecordingFile = fs.createWriteStream(filename);
+      const resolvedFilename = this.resolveRecordingPath(filename);
+      const callRecordingFile = fs.createWriteStream(resolvedFilename);
       this.stereoWavWriter = new Writer(stereoWavOptions);
       this.stereoWavWriter.pipe(callRecordingFile);
-      this.currentRecordingFilename = filename;
+      this.currentRecordingFilename = resolvedFilename;
+      this.attachRecordingStreamErrorHandler(callRecordingFile, "Stereo call recording", () => {
+        this.callRecordingEnabled = false;
+        this.stereoRecorder = null;
+        this.stereoWavWriter = null;
+        this.currentRecordingFilename = null;
+      });
 
       // Initialize real-time stereo recorder with a true timeline
       this.stereoRecorder = new RealTimeStereoRecorder(this.stereoWavWriter, this.audioProcessor);
 
       getLogger().audio.info(
-        `Stereo call recording started: ${filename} (Left: caller, Right: AI) - real-time timeline`
+        `Stereo call recording started: ${resolvedFilename} (Left: caller, Right: AI) - real-time timeline`
       );
     } catch (error) {
       getLogger().audio.error("Failed to setup stereo call recording:", error);
@@ -1206,6 +1226,49 @@ export class AudioBridge extends EventEmitter {
     this.perfStats.resampleTimes = [];
     this.perfStats.encodeTimes = [];
     this.perfStats.networkTimes = [];
+  }
+
+  private resolveRecordingPath(preferredFilename: string): string {
+    const candidates = this.buildRecordingPathCandidates(preferredFilename);
+
+    for (const candidate of candidates) {
+      try {
+        const directory = path.dirname(candidate);
+        fs.mkdirSync(directory, { recursive: true });
+        fs.accessSync(directory, fs.constants.W_OK);
+        return candidate;
+      } catch {
+        continue;
+      }
+    }
+
+    throw new Error(
+      `No writable location available for recording file '${preferredFilename}'`
+    );
+  }
+
+  private buildRecordingPathCandidates(preferredFilename: string): string[] {
+    if (path.isAbsolute(preferredFilename)) {
+      return [preferredFilename];
+    }
+
+    return [
+      path.resolve(process.cwd(), preferredFilename),
+      path.join(os.tmpdir(), preferredFilename),
+    ];
+  }
+
+  private attachRecordingStreamErrorHandler(
+    stream: fs.WriteStream,
+    label: string,
+    onFailure: () => void
+  ): void {
+    stream.once("error", (error) => {
+      getLogger().audio.error(
+        `${label} failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+      onFailure();
+    });
   }
 }
 
