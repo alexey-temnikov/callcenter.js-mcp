@@ -506,7 +506,7 @@ class MCPServer {
       colors,
       timestamps
     } = args;
-    const normalizedPhoneNumber = typeof phone_number === 'string' ? phone_number.replace(/\s+/g, '') : phone_number;
+    const normalizedPhoneNumber = String(phone_number || '').replace(/\s+/g, '');
 
     // Validate required parameters
     if (!normalizedPhoneNumber || !user_name || !goal) {
