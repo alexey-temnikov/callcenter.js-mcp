@@ -202,6 +202,7 @@ export class SIPClient {
             this.patchSipLibraryLogging();
             const sipjsConfig = this.buildSipjsConfiguration();
             this.userAgent = new SIPUDP.UA(sipjsConfig);
+            this.installTransportDisconnectShim();
             this.setupEventHandlers();
             this.startKeepalive();
             getLogger().sip.debug("SIP User Agent configured and starting...");
@@ -338,6 +339,7 @@ export class SIPClient {
     setupEventHandlers() {
         // Enhanced event handlers with state tracking
         this.userAgent.on("connected", () => {
+            this.installTransportDisconnectShim();
             this.connectionState = 'connected';
             getLogger().sip.debug("SIP User Agent connected");
             this.eventCallback({ type: "CONNECTED" });
@@ -479,6 +481,30 @@ export class SIPClient {
                 }
             };
         }
+    }
+    installTransportDisconnectShim() {
+        const transport = this.userAgent?.transport;
+        if (!transport || typeof transport.disconnect === 'function') {
+            return;
+        }
+        transport.disconnect = () => {
+            try {
+                transport.closed = true;
+                transport.connected = false;
+                if (transport.reconnectTimer) {
+                    clearTimeout(transport.reconnectTimer);
+                    transport.reconnectTimer = null;
+                }
+                if (transport.server && typeof transport.server.close === 'function') {
+                    transport.server.close();
+                }
+                transport.client = null;
+            }
+            catch (error) {
+                getLogger().sip.warn(`Ignored sipjs-udp transport disconnect failure: ${error instanceof Error ? error.message : String(error)}`);
+            }
+        };
+        getLogger().sip.debug("Installed sipjs-udp transport.disconnect() compatibility shim");
     }
     startKeepalive() {
         if (!this.config.keepAlive)
@@ -650,6 +676,7 @@ export class SIPClient {
             await this.endCall();
         }
         if (this.userAgent) {
+            this.installTransportDisconnectShim();
             this.userAgent.stop();
             this.userAgent = null;
         }

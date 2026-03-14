@@ -26,6 +26,7 @@ export declare class SIPClient {
     private handleFritzBoxError;
     private handleTransportFallback;
     private patchSipLibraryLogging;
+    private installTransportDisconnectShim;
     private startKeepalive;
     private sendKeepalive;
     private stopKeepalive;

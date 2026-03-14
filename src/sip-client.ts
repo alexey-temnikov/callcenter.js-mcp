@@ -240,6 +240,7 @@ export class SIPClient {
       
       const sipjsConfig = this.buildSipjsConfiguration();
       this.userAgent = new SIPUDP.UA(sipjsConfig);
+      this.installTransportDisconnectShim();
 
       this.setupEventHandlers();
       this.startKeepalive();
@@ -409,6 +410,7 @@ export class SIPClient {
   private setupEventHandlers(): void {
     // Enhanced event handlers with state tracking
     this.userAgent.on("connected", () => {
+      this.installTransportDisconnectShim();
       this.connectionState = 'connected';
       getLogger().sip.debug("SIP User Agent connected");
       this.eventCallback({ type: "CONNECTED" });
@@ -573,6 +575,39 @@ export class SIPClient {
         }
       };
     }
+  }
+
+  private installTransportDisconnectShim(): void {
+    const transport = this.userAgent?.transport;
+    if (!transport || typeof transport.disconnect === 'function') {
+      return;
+    }
+
+    transport.disconnect = () => {
+      try {
+        transport.closed = true;
+        transport.connected = false;
+
+        if (transport.reconnectTimer) {
+          clearTimeout(transport.reconnectTimer);
+          transport.reconnectTimer = null;
+        }
+
+        if (transport.server && typeof transport.server.close === 'function') {
+          transport.server.close();
+        }
+
+        transport.client = null;
+      } catch (error) {
+        getLogger().sip.warn(
+          `Ignored sipjs-udp transport disconnect failure: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    };
+
+    getLogger().sip.debug(
+      "Installed sipjs-udp transport.disconnect() compatibility shim"
+    );
   }
 
 
@@ -774,6 +809,7 @@ export class SIPClient {
     }
 
     if (this.userAgent) {
+      this.installTransportDisconnectShim();
       this.userAgent.stop();
       this.userAgent = null;
     }
