@@ -385,12 +385,13 @@ class MCPServer {
     }
     async handleSimpleCall(args) {
         const { phone_number, brief, caller_name, config_path, duration, recording, voice } = args;
+        const normalizedPhoneNumber = typeof phone_number === 'string' ? phone_number.replace(/\s+/g, '') : phone_number;
         // Validate required parameters
-        if (!phone_number || !brief || !caller_name) {
+        if (!normalizedPhoneNumber || !brief || !caller_name) {
             throw new Error("Missing required parameters: phone_number, brief, and caller_name are required");
         }
         // Validate phone number format
-        if (!/^[\+\*#0-9]+$/.test(phone_number)) {
+        if (!/^[\+\*#0-9]+$/.test(normalizedPhoneNumber)) {
             throw new Error("Invalid phone number format. Use digits, +, *, or # characters (e.g., +1234567890, **621, #123)");
         }
         // Validate brief length and content
@@ -401,7 +402,7 @@ class MCPServer {
             throw new Error("Brief too long. Keep it under 10,000 characters for optimal instruction generation.");
         }
         const callOptions = {
-            number: phone_number,
+            number: normalizedPhoneNumber,
             brief,
             userName: caller_name,
             config: config_path || 'config.json',
@@ -430,8 +431,9 @@ class MCPServer {
     }
     async handleAdvancedCall(args) {
         const { phone_number, user_name, target_name, goal, language, date, time, location, constraints, fallback_options, user_contact_return, budget, urgency, industry, jurisdiction, allow_persuasion_white_lies, requires_formality, voice, config, config_path, duration, recording, recording_filename, log_level, colors, timestamps } = args;
+        const normalizedPhoneNumber = typeof phone_number === 'string' ? phone_number.replace(/\s+/g, '') : phone_number;
         // Validate required parameters
-        if (!phone_number || !user_name || !goal) {
+        if (!normalizedPhoneNumber || !user_name || !goal) {
             throw new Error("Missing required parameters: phone_number, user_name, and goal are required");
         }
         // Validate configuration is provided
@@ -439,7 +441,7 @@ class MCPServer {
             throw new Error("Either config object or config_path must be provided");
         }
         // Validate phone number format
-        if (!/^[\+\*#0-9]+$/.test(phone_number)) {
+        if (!/^[\+\*#0-9]+$/.test(normalizedPhoneNumber)) {
             throw new Error("Invalid phone number format. Use digits, +, *, or # characters (e.g., +1234567890, **621, #123)");
         }
         // Validate goal length
@@ -479,7 +481,7 @@ class MCPServer {
             briefText += ` Formality level: ${requires_formality}.`;
         briefText += ` Calling on behalf of ${user_name}.`;
         const callOptions = {
-            number: phone_number,
+            number: normalizedPhoneNumber,
             brief: briefText,
             userName: user_name,
             config: config || config_path,
