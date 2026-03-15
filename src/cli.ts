@@ -68,10 +68,10 @@ program
         logger.warn('Failed to load config file, trying environment variables...', 'CONFIG');
         const envConfig = loadConfigFromEnv();
         
-        if (!envConfig.sip?.username || !envConfig.ai?.openaiApiKey) {
+        if (!envConfig.sip?.username || !(envConfig.ai?.openaiApiKey || envConfig.ai?.geminiApiKey)) {
           logger.error('No valid configuration found.', 'CONFIG');
           logger.error('Either provide a config file with --config or set environment variables:', 'CONFIG');
-          logger.error('  SIP_USERNAME, SIP_PASSWORD, SIP_SERVER_IP, OPENAI_API_KEY', 'CONFIG');
+          logger.error('  SIP_USERNAME, SIP_PASSWORD, SIP_SERVER_IP, OPENAI_API_KEY (or GEMINI_API_KEY with AI_PROVIDER=gemini)', 'CONFIG');
           process.exit(1);
         }
         

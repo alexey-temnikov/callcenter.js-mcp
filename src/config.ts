@@ -241,6 +241,7 @@ export function createSampleConfig(outputPath: string): void {
       localPort: 5060
     },
     ai: {
+      provider: "openai",
       openaiApiKey: "your_openai_api_key_here",
       voice: "alloy",
       instructions: "You are a helpful AI assistant speaking on a phone call. Keep your responses concise and natural, as if you're having a real conversation."
@@ -272,7 +273,15 @@ function validateConfig(config: any): void {
     throw new Error('Missing AI configuration');
   }
 
-  if (!config.ai.openaiApiKey) {
+  const aiProvider = config.ai.provider || 'openai';
+  const hasOpenAIKey = !!config.ai.openaiApiKey;
+  const hasGeminiKey = !!config.ai.geminiApiKey;
+
+  if (aiProvider === 'gemini' && !hasGeminiKey) {
+    throw new Error('Missing Gemini API key');
+  }
+
+  if (aiProvider !== 'gemini' && !hasOpenAIKey) {
     throw new Error('Missing OpenAI API key');
   }
 
@@ -457,9 +466,12 @@ export function loadConfigFromEnv(): Partial<Config> {
       localPort: parseInt(process.env.SIP_LOCAL_PORT || '5060')
     },
     ai: {
+      provider: (process.env.AI_PROVIDER as 'openai' | 'gemini') || 'openai',
       openaiApiKey: process.env.OPENAI_API_KEY || '',
-      voice: (process.env.OPENAI_VOICE as any) || 'auto',
-      instructions: process.env.OPENAI_INSTRUCTIONS
+      geminiApiKey: process.env.GEMINI_API_KEY || '',
+      model: process.env.AI_MODEL || process.env.GEMINI_MODEL,
+      voice: (process.env.OPENAI_VOICE as any) || process.env.GEMINI_VOICE || 'auto',
+      instructions: process.env.OPENAI_INSTRUCTIONS || process.env.AI_INSTRUCTIONS
     }
   };
 }

@@ -177,6 +177,11 @@ SIP_USERNAME=your_extension
 SIP_PASSWORD=your_password
 SIP_SERVER_IP=192.168.1.1
 OPENAI_API_KEY=sk-your-key-here
+AI_PROVIDER=openai
+# For Gemini Live instead:
+# AI_PROVIDER=gemini
+# GEMINI_API_KEY=your-gemini-api-key
+# GEMINI_MODEL=models/gemini-2.0-flash-live-001
 SIP_PROVIDER=fritz-box
 OPENAI_VOICE=auto
 EOF
@@ -226,10 +231,25 @@ Edit `config.json` with your settings:
     "provider": "fritz-box"
   },
   "ai": {
+    "provider": "openai",
     "openaiApiKey": "sk-your-openai-api-key-here",
     "voice": "alloy",
     "instructions": "You are a helpful AI assistant making phone calls on behalf of users.",
     "userName": "Your Name"
+  }
+}
+```
+
+To use **Google Gemini Live API** instead of OpenAI Realtime, set the AI provider and Gemini key:
+
+```json
+{
+  "ai": {
+    "provider": "gemini",
+    "geminiApiKey": "your-gemini-api-key",
+    "model": "models/gemini-2.0-flash-live-001",
+    "voice": "Puck",
+    "instructions": "You are a helpful AI assistant making phone calls on behalf of users."
   }
 }
 ```
@@ -548,6 +568,11 @@ SIP_USERNAME=your_extension
 SIP_PASSWORD=your_password  
 SIP_SERVER_IP=192.168.1.1
 OPENAI_API_KEY=sk-your-key-here
+AI_PROVIDER=openai
+# For Gemini Live instead:
+# AI_PROVIDER=gemini
+# GEMINI_API_KEY=your-gemini-api-key
+# GEMINI_MODEL=models/gemini-2.0-flash-live-001
 USER_NAME="Your Name"                                     # Required when using --brief
 ```
 

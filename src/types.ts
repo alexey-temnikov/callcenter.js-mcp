@@ -105,7 +105,10 @@ export interface CallConfig {
 }
 
 export interface AIVoiceConfig {
-  openaiApiKey: string;
+  provider?: 'openai' | 'gemini';
+  openaiApiKey?: string;
+  geminiApiKey?: string;
+  model?: string;
   voice?: string;
   instructions?: string;
   brief?: string;
