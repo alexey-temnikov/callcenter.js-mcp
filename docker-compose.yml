@@ -11,14 +11,14 @@ services:
       # MCP HTTP settings (examples)
       MCP_HTTP_HOST: 0.0.0.0
       MCP_HTTP_PORT: 3001
-      MCP_HTTP_TOKEN: replace-with-a-strong-random-token
+      MCP_HTTP_TOKEN: ${MCP_HTTP_TOKEN:?MCP_HTTP_TOKEN environment variable required}
 
       # SIP credentials (examples)
-      SIP_USERNAME: "100"
-      SIP_PASSWORD: "your-sip-password"
-      SIP_SERVER_IP: "192.168.1.10"
-      SIP_SERVER_PORT: "5060"
+      SIP_USERNAME: ${SIP_USERNAME:?SIP_USERNAME environment variable required}
+      SIP_PASSWORD: ${SIP_PASSWORD:?SIP_PASSWORD environment variable required}
+      SIP_SERVER_IP: ${SIP_SERVER_IP:?SIP_SERVER_IP environment variable required}
+      SIP_SERVER_PORT: ${SIP_SERVER_PORT:-5060}
 
       # OpenAI credentials (examples)
-      OPENAI_API_KEY: "sk-your-openai-api-key"
-      USER_NAME: "Your Name"
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY environment variable required}
+      USER_NAME: ${USER_NAME:-User}

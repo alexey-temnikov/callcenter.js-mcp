@@ -325,11 +325,11 @@ class MCPServer {
                             process.stdout.write(JSON.stringify(response) + '\n');
                         }).catch((error) => {
                             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-                            process.stdout.write(JSON.stringify(this.buildErrorResponse(request.id, -32603, `Internal error: ${errorMessage}`)) + '\n');
+                            process.stdout.write(JSON.stringify(this.buildErrorResponse(request.id ?? null, -32603, `Internal error: ${errorMessage}`)) + '\n');
                         });
                     }
                     catch (error) {
-                        process.stdout.write(JSON.stringify(this.buildErrorResponse(0, -32700, 'Parse error')) + '\n');
+                        process.stdout.write(JSON.stringify(this.buildErrorResponse(null, -32700, 'Parse error')) + '\n');
                     }
                 }
             }
@@ -339,17 +339,24 @@ class MCPServer {
         });
     }
     async processRequest(request) {
+        const requestId = request?.id ?? null;
+        if (!request || request.jsonrpc !== '2.0' || typeof request.method !== 'string') {
+            return this.buildErrorResponse(requestId, -32600, 'Invalid Request');
+        }
         try {
             switch (request.method) {
                 case 'tools/list':
-                    return this.buildResponse(request.id, {
+                    return this.buildResponse(requestId, {
                         tools: [SIMPLE_CALL_TOOL, ADVANCED_CALL_TOOL]
                     });
                 case 'tools/call':
+                    if (!request.params || typeof request.params !== 'object') {
+                        return this.buildErrorResponse(requestId, -32602, 'Invalid params');
+                    }
                     const result = await this.handleToolCall(request.params);
-                    return this.buildResponse(request.id, result);
+                    return this.buildResponse(requestId, result);
                 case 'initialize':
-                    return this.buildResponse(request.id, {
+                    return this.buildResponse(requestId, {
                         protocolVersion: "2024-11-05",
                         capabilities: {
                             tools: {}
@@ -360,12 +367,12 @@ class MCPServer {
                         }
                     });
                 default:
-                    return this.buildErrorResponse(request.id, -32601, `Method not found: ${request.method}`);
+                    return this.buildErrorResponse(requestId, -32601, `Method not found: ${request.method}`);
             }
         }
         catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            return this.buildErrorResponse(request.id, -32603, `Internal error: ${errorMessage}`);
+            return this.buildErrorResponse(requestId, -32603, `Internal error: ${errorMessage}`);
         }
     }
     async handleToolCall(params) {
@@ -425,10 +432,10 @@ class MCPServer {
             body += chunk.toString();
         });
         await new Promise((resolve) => req.on('end', () => resolve()));
-        let requestId = 0;
+        let requestId = null;
         try {
             const request = JSON.parse(body || '{}');
-            requestId = request.id;
+            requestId = request?.id ?? null;
             const response = await this.processRequest(request);
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify(response));
@@ -606,7 +613,10 @@ class MCPServer {
                     res.end(JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }));
                 });
             });
-            server.listen(port, host);
+            await new Promise((resolve, reject) => {
+                server.once('error', reject);
+                server.listen(port, host, () => resolve());
+            });
             console.error(`[MCP Server] AI Voice Agent MCP server running on HTTP at http://${host}:${port}/mcp/${token}`);
         }
         // Keep the process alive

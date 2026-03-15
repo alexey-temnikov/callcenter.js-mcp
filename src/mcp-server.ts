@@ -305,14 +305,14 @@ const ADVANCED_CALL_TOOL = {
 
 interface MCPRequest {
   jsonrpc: '2.0';
-  id: string | number;
-  method: string;
+  id?: string | number | null;
+  method?: string;
   params?: any;
 }
 
 interface MCPResponse {
   jsonrpc: '2.0';
-  id: string | number;
+  id: string | number | null;
   result?: any;
   error?: {
     code: number;
@@ -335,11 +335,16 @@ class MCPServer {
     if (this.mode === 'stdio') {
       this.setupStdioHandling();
     } else {
+    } else {
+      if (!options?.token) {
+        throw new Error('MCP_HTTP_TOKEN is required for HTTP mode. Set via --mcp-token flag or MCP_HTTP_TOKEN environment variable.');
+      }
       this.httpOptions = {
         host: options?.host || '0.0.0.0',
         port: options?.port || 3001,
-        token: options?.token || randomBytes(18).toString('hex')
+        token: options.token
       };
+    }
     }
   }
 
@@ -361,10 +366,10 @@ class MCPServer {
               process.stdout.write(JSON.stringify(response) + '\n');
             }).catch((error) => {
               const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-              process.stdout.write(JSON.stringify(this.buildErrorResponse(request.id, -32603, `Internal error: ${errorMessage}`)) + '\n');
+              process.stdout.write(JSON.stringify(this.buildErrorResponse(request.id ?? null, -32603, `Internal error: ${errorMessage}`)) + '\n');
             });
           } catch (error) {
-            process.stdout.write(JSON.stringify(this.buildErrorResponse(0, -32700, 'Parse error')) + '\n');
+            process.stdout.write(JSON.stringify(this.buildErrorResponse(null, -32700, 'Parse error')) + '\n');
           }
         }
       }
@@ -376,19 +381,29 @@ class MCPServer {
   }
 
   private async processRequest(request: MCPRequest): Promise<MCPResponse> {
+    const requestId = request?.id ?? null;
+
+    if (!request || request.jsonrpc !== '2.0' || typeof request.method !== 'string') {
+      return this.buildErrorResponse(requestId, -32600, 'Invalid Request');
+    }
+
     try {
       switch (request.method) {
         case 'tools/list':
-          return this.buildResponse(request.id, {
+          return this.buildResponse(requestId, {
             tools: [SIMPLE_CALL_TOOL, ADVANCED_CALL_TOOL]
           });
-          
+
+
         case 'tools/call':
+          if (!request.params || typeof request.params !== 'object') {
+            return this.buildErrorResponse(requestId, -32602, 'Invalid params');
+          }
           const result = await this.handleToolCall(request.params);
-          return this.buildResponse(request.id, result);
-          
+          return this.buildResponse(requestId, result);
+
         case 'initialize':
-          return this.buildResponse(request.id, {
+          return this.buildResponse(requestId, {
             protocolVersion: "2024-11-05",
             capabilities: {
               tools: {}
@@ -398,13 +413,13 @@ class MCPServer {
               version: "1.0.0"
             }
           });
-          
+
         default:
-          return this.buildErrorResponse(request.id, -32601, `Method not found: ${request.method}`);
+          return this.buildErrorResponse(requestId, -32601, `Method not found: ${request.method}`);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return this.buildErrorResponse(request.id, -32603, `Internal error: ${errorMessage}`);
+      return this.buildErrorResponse(requestId, -32603, `Internal error: ${errorMessage}`);
     }
   }
 
@@ -423,7 +438,7 @@ class MCPServer {
     }
   }
 
-  private buildResponse(id: string | number, result: any): MCPResponse {
+  private buildResponse(id: string | number | null, result: any): MCPResponse {
     return {
       jsonrpc: '2.0',
       id,
@@ -431,7 +446,7 @@ class MCPServer {
     };
   }
 
-  private buildErrorResponse(id: string | number, code: number, message: string, data?: any): MCPResponse {
+  private buildErrorResponse(id: string | number | null, code: number, message: string, data?: any): MCPResponse {
     return {
       jsonrpc: '2.0',
       id,
@@ -472,23 +487,27 @@ class MCPServer {
     }
 
     let body = '';
-    const maxBodySize = 1024 * 1024; // 1MB limit
+    let bodySize = 0;
+    const MAX_BODY_SIZE = 10 * 1024 * 1024; // 10MB limit
+
+
     req.on('data', (chunk) => {
-      body += chunk.toString();
-      if (body.length > maxBodySize) {
+      bodySize += chunk.length;
+      if (bodySize > MAX_BODY_SIZE) {
         req.destroy();
         res.writeHead(413, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Request body too large' }));
         return;
       }
+      body += chunk.toString();
     });
 
     await new Promise<void>((resolve) => req.on('end', () => resolve()));
 
-    let requestId: string | number = 0;
+    let requestId: string | number | null = null;
     try {
       const request: MCPRequest = JSON.parse(body || '{}');
-      requestId = request.id;
+      requestId = request?.id ?? null;
       const response = await this.processRequest(request);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(response));
@@ -703,7 +722,10 @@ class MCPServer {
           res.end(JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }));
         });
       });
-      server.listen(port, host);
+      await new Promise<void>((resolve, reject) => {
+        server.once('error', reject);
+        server.listen(port, host, () => resolve());
+      });
       console.error(`[MCP Server] AI Voice Agent MCP server running on HTTP at http://${host}:${port}/mcp/${token}`);
     }
     

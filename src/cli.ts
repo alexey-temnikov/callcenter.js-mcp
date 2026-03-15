@@ -354,6 +354,12 @@ if (process.argv.includes('--mcp') || process.argv.includes('--mcp-http')) {
 
 async function startMCPServerFromArgs() {
   const mcpHttpEnabled = process.argv.includes('--mcp-http');
+  const mcpStdioEnabled = process.argv.includes('--mcp');
+
+  if (mcpHttpEnabled && mcpStdioEnabled) {
+    console.error('Invalid MCP startup flags: use either --mcp (stdio) or --mcp-http (HTTP), not both.');
+    process.exit(1);
+  }
 
   const readArgValue = (flag: string): string | undefined => {
     const index = process.argv.indexOf(flag);
