@@ -6,9 +6,11 @@
  * 1. simple_call - Easy calling with brief generation via o3
  * 2. advanced_call - Granular control over all call parameters
  *
- * This is a simplified MCP-compatible server that communicates via stdio
+ * This is a simplified MCP-compatible server that communicates via stdio or HTTP
  */
 import { makeCall } from './index.js';
+import { createServer } from 'http';
+import { randomBytes } from 'crypto';
 /**
  * Simple call tool for basic usage with o3 instruction generation
  */
@@ -293,8 +295,20 @@ const ADVANCED_CALL_TOOL = {
     }
 };
 class MCPServer {
-    constructor() {
-        this.setupStdioHandling();
+    mode;
+    httpOptions;
+    constructor(options) {
+        this.mode = options?.mode || 'stdio';
+        if (this.mode === 'stdio') {
+            this.setupStdioHandling();
+        }
+        else {
+            this.httpOptions = {
+                host: options?.host || '0.0.0.0',
+                port: options?.port || 3001,
+                token: options?.token || randomBytes(18).toString('hex')
+            };
+        }
     }
     setupStdioHandling() {
         let buffer = '';
@@ -307,10 +321,15 @@ class MCPServer {
                 if (line.trim()) {
                     try {
                         const request = JSON.parse(line.trim());
-                        this.handleRequest(request);
+                        this.processRequest(request).then((response) => {
+                            process.stdout.write(JSON.stringify(response) + '\n');
+                        }).catch((error) => {
+                            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                            process.stdout.write(JSON.stringify(this.buildErrorResponse(request.id ?? null, -32603, `Internal error: ${errorMessage}`)) + '\n');
+                        });
                     }
                     catch (error) {
-                        this.sendError(null, -32700, 'Parse error');
+                        process.stdout.write(JSON.stringify(this.buildErrorResponse(null, -32700, 'Parse error')) + '\n');
                     }
                 }
             }
@@ -319,20 +338,25 @@ class MCPServer {
             process.exit(0);
         });
     }
-    async handleRequest(request) {
+    async processRequest(request) {
+        const requestId = request?.id ?? null;
+        if (!request || request.jsonrpc !== '2.0' || typeof request.method !== 'string') {
+            return this.buildErrorResponse(requestId, -32600, 'Invalid Request');
+        }
         try {
             switch (request.method) {
                 case 'tools/list':
-                    this.sendResponse(request.id, {
+                    return this.buildResponse(requestId, {
                         tools: [SIMPLE_CALL_TOOL, ADVANCED_CALL_TOOL]
                     });
-                    break;
                 case 'tools/call':
+                    if (!request.params || typeof request.params !== 'object') {
+                        return this.buildErrorResponse(requestId, -32602, 'Invalid params');
+                    }
                     const result = await this.handleToolCall(request.params);
-                    this.sendResponse(request.id, result);
-                    break;
+                    return this.buildResponse(requestId, result);
                 case 'initialize':
-                    this.sendResponse(request.id, {
+                    return this.buildResponse(requestId, {
                         protocolVersion: "2024-11-05",
                         capabilities: {
                             tools: {}
@@ -342,14 +366,13 @@ class MCPServer {
                             version: "1.0.0"
                         }
                     });
-                    break;
                 default:
-                    this.sendError(request.id, -32601, `Method not found: ${request.method}`);
+                    return this.buildErrorResponse(requestId, -32601, `Method not found: ${request.method}`);
             }
         }
         catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            this.sendError(request.id, -32603, `Internal error: ${errorMessage}`);
+            return this.buildErrorResponse(requestId, -32603, `Internal error: ${errorMessage}`);
         }
     }
     async handleToolCall(params) {
@@ -363,25 +386,65 @@ class MCPServer {
                 throw new Error(`Unknown tool: ${name}`);
         }
     }
-    sendResponse(id, result) {
-        const response = {
+    buildResponse(id, result) {
+        return {
             jsonrpc: '2.0',
             id,
             result
         };
-        process.stdout.write(JSON.stringify(response) + '\n');
     }
-    sendError(id, code, message, data) {
-        const response = {
+    buildErrorResponse(id, code, message, data) {
+        return {
             jsonrpc: '2.0',
-            id: id || 0,
+            id,
             error: {
                 code,
                 message,
                 data
             }
         };
-        process.stdout.write(JSON.stringify(response) + '\n');
+    }
+    async handleHttpRequest(req, res) {
+        if (!this.httpOptions) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'HTTP server not configured' }));
+            return;
+        }
+        const expectedPath = `/mcp/${this.httpOptions.token}`;
+        const requestPath = (req.url || '').split('?')[0];
+        if (requestPath !== expectedPath) {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Not found' }));
+            return;
+        }
+        if (req.method === 'GET') {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ status: 'ok', transport: 'http' }));
+            return;
+        }
+        if (req.method !== 'POST') {
+            res.writeHead(405, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Method not allowed. Use POST for JSON-RPC requests.' }));
+            return;
+        }
+        let body = '';
+        req.on('data', (chunk) => {
+            body += chunk.toString();
+        });
+        await new Promise((resolve) => req.on('end', () => resolve()));
+        let requestId = null;
+        try {
+            const request = JSON.parse(body || '{}');
+            requestId = request?.id ?? null;
+            const response = await this.processRequest(request);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(response));
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(this.buildErrorResponse(requestId, -32700, `Parse error: ${errorMessage}`)));
+        }
     }
     async handleSimpleCall(args) {
         const { phone_number, brief, caller_name, config_path, duration, recording, voice } = args;
@@ -539,7 +602,23 @@ class MCPServer {
     }
     async start() {
         this.setupErrorHandling();
-        console.error('[MCP Server] AI Voice Agent MCP server running on stdio');
+        if (this.mode === 'stdio') {
+            console.error('[MCP Server] AI Voice Agent MCP server running on stdio');
+        }
+        else if (this.httpOptions) {
+            const { host, port, token } = this.httpOptions;
+            const server = createServer((req, res) => {
+                this.handleHttpRequest(req, res).catch((error) => {
+                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }));
+                });
+            });
+            await new Promise((resolve, reject) => {
+                server.once('error', reject);
+                server.listen(port, host, () => resolve());
+            });
+            console.error(`[MCP Server] AI Voice Agent MCP server running on HTTP at http://${host}:${port}/mcp/${token}`);
+        }
         // Keep the process alive
         return new Promise(() => {
             // This promise never resolves, keeping the server running
@@ -548,7 +627,22 @@ class MCPServer {
 }
 // Export function to start the server
 export async function startMCPServer() {
-    const server = new MCPServer();
+    const server = new MCPServer({ mode: 'stdio' });
+    try {
+        await server.start();
+    }
+    catch (error) {
+        console.error('[MCP Server] Failed to start server:', error);
+        process.exit(1);
+    }
+}
+export async function startMCPHttpServer(options) {
+    const server = new MCPServer({
+        mode: 'http',
+        host: options?.host,
+        port: options?.port,
+        token: options?.token
+    });
     try {
         await server.start();
     }
