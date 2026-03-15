@@ -335,7 +335,6 @@ class MCPServer {
     if (this.mode === 'stdio') {
       this.setupStdioHandling();
     } else {
-    } else {
       if (!options?.token) {
         throw new Error('MCP_HTTP_TOKEN is required for HTTP mode. Set via --mcp-token flag or MCP_HTTP_TOKEN environment variable.');
       }
@@ -344,7 +343,6 @@ class MCPServer {
         port: options?.port || 3001,
         token: options.token
       };
-    }
     }
   }
 
