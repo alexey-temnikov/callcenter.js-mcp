@@ -482,15 +482,19 @@ class MCPServer {
     }
 
     let body = '';
-    const maxBodySize = 1024 * 1024; // 1MB limit
+    let bodySize = 0;
+    const MAX_BODY_SIZE = 10 * 1024 * 1024; // 10MB limit
+
+
     req.on('data', (chunk) => {
-      body += chunk.toString();
-      if (body.length > maxBodySize) {
+      bodySize += chunk.length;
+      if (bodySize > MAX_BODY_SIZE) {
         req.destroy();
         res.writeHead(413, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Request body too large' }));
         return;
       }
+      body += chunk.toString();
     });
 
     await new Promise<void>((resolve) => req.on('end', () => resolve()));
