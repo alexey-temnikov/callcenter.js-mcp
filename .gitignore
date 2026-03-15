@@ -163,5 +163,4 @@ native/g722/*.o
 native/g722/*.obj
 
 # Example config (keep template, ignore actual config)
-config.json
 !config.example.json
