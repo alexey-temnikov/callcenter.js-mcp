@@ -12,7 +12,11 @@ program
     .name('ai-voice-agent')
     .description('AI Voice Agent for SIP calls using OpenAI Realtime API')
     .version('1.0.0')
-    .option('--mcp', 'Start MCP server mode for integration with MCP clients');
+    .option('--mcp', 'Start MCP server mode over stdio for local MCP clients')
+    .option('--mcp-http', 'Start MCP server over HTTP for remote clients')
+    .option('--mcp-host <host>', 'Host interface for HTTP MCP server', '0.0.0.0')
+    .option('--mcp-port <port>', 'Port for HTTP MCP server', '3001')
+    .option('--mcp-token <token>', 'Authentication token embedded in MCP HTTP URL');
 program
     .command('call')
     .description('Make a call to a phone number')
@@ -308,16 +312,36 @@ program
     }
 });
 // Check for MCP mode before parsing to avoid Commander.js help display
-if (process.argv.includes('--mcp')) {
-    startMCPServer();
+if (process.argv.includes('--mcp') || process.argv.includes('--mcp-http')) {
+    startMCPServerFromArgs();
 }
 else {
     program.parse();
 }
-async function startMCPServer() {
+async function startMCPServerFromArgs() {
+    const mcpHttpEnabled = process.argv.includes('--mcp-http');
+    const readArgValue = (flag) => {
+        const index = process.argv.indexOf(flag);
+        if (index === -1 || index + 1 >= process.argv.length) {
+            return undefined;
+        }
+        const value = process.argv[index + 1];
+        return value.startsWith('--') ? undefined : value;
+    };
     try {
-        const { startMCPServer: startServer } = await import('./mcp-server.js');
-        await startServer();
+        if (mcpHttpEnabled) {
+            const { startMCPHttpServer } = await import('./mcp-server.js');
+            const host = readArgValue('--mcp-host') || process.env.MCP_HTTP_HOST || '0.0.0.0';
+            const port = parseInt(readArgValue('--mcp-port') || process.env.MCP_HTTP_PORT || '3001', 10);
+            const token = readArgValue('--mcp-token') || process.env.MCP_HTTP_TOKEN;
+            if (!Number.isFinite(port) || port <= 0 || port > 65535) {
+                throw new Error('Invalid --mcp-port value. Must be a valid TCP port between 1 and 65535.');
+            }
+            await startMCPHttpServer({ host, port, token });
+            return;
+        }
+        const { startMCPServer } = await import('./mcp-server.js');
+        await startMCPServer();
     }
     catch (error) {
         console.error('Failed to start MCP server:', error instanceof Error ? error.message : 'Unknown error');

@@ -6,7 +6,12 @@
  * 1. simple_call - Easy calling with brief generation via o3
  * 2. advanced_call - Granular control over all call parameters
  *
- * This is a simplified MCP-compatible server that communicates via stdio
+ * This is a simplified MCP-compatible server that communicates via stdio or HTTP
  */
 export declare function startMCPServer(): Promise<void>;
+export declare function startMCPHttpServer(options?: {
+    host?: string;
+    port?: number;
+    token?: string;
+}): Promise<void>;
 //# sourceMappingURL=mcp-server.d.ts.map

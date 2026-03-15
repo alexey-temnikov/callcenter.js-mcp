@@ -304,6 +304,36 @@ Available MCP tools:
 - `simple_call` - Make calls with automatic instruction generation
 - `advanced_call` - Make calls with granular parameter control
 
+#### **Remote MCP over HTTP (for AI agents on other machines)**
+
+You can also expose the MCP server over HTTP with a token embedded in the URL:
+
+```bash
+npm start -- --mcp-http --mcp-host 0.0.0.0 --mcp-port 3001 --mcp-token "your-secret-token"
+```
+
+If you omit `--mcp-token`, a secure random token is generated at startup and printed in the server URL.
+
+- Endpoint format: `http://<host>:<port>/mcp/<token>`
+- `POST` JSON-RPC requests to call MCP methods (`initialize`, `tools/list`, `tools/call`)
+- `GET` on the same URL returns a simple health response
+
+Environment variable equivalents:
+- `MCP_HTTP_HOST`
+- `MCP_HTTP_PORT`
+- `MCP_HTTP_TOKEN`
+
+#### **Run MCP HTTP with Docker**
+
+A containerized setup is included:
+
+```bash
+docker compose up --build
+```
+
+- `Dockerfile` builds and starts the MCP server in HTTP mode.
+- `docker-compose.yml` contains sample environment values for MCP token auth, SIP credentials, and OpenAI key. Replace them before use.
+
 **Example usage in MCP Client:**
 
 ```
