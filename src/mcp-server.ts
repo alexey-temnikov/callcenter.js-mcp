@@ -472,8 +472,15 @@ class MCPServer {
     }
 
     let body = '';
+    const maxBodySize = 1024 * 1024; // 1MB limit
     req.on('data', (chunk) => {
       body += chunk.toString();
+      if (body.length > maxBodySize) {
+        req.destroy();
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Request body too large' }));
+        return;
+      }
     });
 
     await new Promise<void>((resolve) => req.on('end', () => resolve()));
