@@ -39,7 +39,7 @@ export SIP_PASSWORD="your_password"
 export SIP_SERVER_IP="192.168.1.1"
 export OPENAI_API_KEY="sk-your-key"
 
-npx github:gerkensm/callcenter.js-mcp call "+1234567890" \
+npx github:alexey-temnikov/callcenter.js-mcp call "+1234567890" \
   --brief "Call the restaurant and book a table for 2 at 7 PM" \
   --user-name "Your Name"
 ```
@@ -53,7 +53,7 @@ export SIP_SERVER_IP="192.168.1.1"
 export AI_PROVIDER="gemini"
 export GEMINI_API_KEY="your-gemini-key"
 
-npx github:gerkensm/callcenter.js-mcp call "+1234567890" \
+npx github:alexey-temnikov/callcenter.js-mcp call "+1234567890" \
   --instructions "Call the restaurant, ask if they are open, and keep the conversation short." \
   --user-name "Your Name"
 ```
@@ -69,7 +69,7 @@ claude mcp add \
   --env SIP_SERVER_IP=192.168.1.1 \
   --env OPENAI_API_KEY=sk-your-key \
   --env USER_NAME="Your Name" \
-  -- callcenter.js npx -- github:gerkensm/callcenter.js-mcp --mcp
+  -- callcenter.js npx -- github:alexey-temnikov/callcenter.js-mcp --mcp
 ```
 
 Then ask Claude to make the call.
@@ -77,7 +77,7 @@ Then ask Claude to make the call.
 ## Local Install
 
 ```bash
-git clone https://github.com/gerkensm/callcenter.js-mcp
+git clone https://github.com/alexey-temnikov/callcenter.js-mcp
 cd callcenter.js-mcp
 npm install
 cp config.example.json config.json
