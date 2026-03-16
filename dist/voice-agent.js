@@ -2,6 +2,7 @@ import { EventEmitter } from "events";
 import { networkInterfaces } from "os";
 import { SIPClient } from "./sip-client.js";
 import { OpenAIClient } from "./openai-client.js";
+import { GeminiClient } from "./gemini-client.js";
 import { AudioBridge } from "./audio-bridge.js";
 import { PerformanceMonitor } from "./performance-monitor.js";
 import { ConnectionManager } from "./connection-manager.js";
@@ -29,12 +30,16 @@ export class VoiceAgent extends EventEmitter {
         this.enableCallRecording = options?.enableCallRecording ?? false;
         // Determine if we're using enhanced configuration with ConnectionManager
         const sipConfig = config.sip;
-        const aiConfig = config.ai || config.openai;
+        const aiConfig = this.getAIConfig(config);
         if (!aiConfig) {
             throw new Error('AI configuration is required (either ai or openai section)');
         }
         this.sipClient = new SIPClient(sipConfig, this.handleSipEvent.bind(this));
-        this.openaiClient = new OpenAIClient(aiConfig);
+        const aiProvider = aiConfig.provider || "openai";
+        this.openaiClient = aiProvider === "gemini"
+            ? new GeminiClient(aiConfig)
+            : new OpenAIClient(aiConfig);
+        getLogger().ai.info(`Using AI provider: ${aiProvider}`, "AI");
         // Initialize ConnectionManager if using enhanced config
         if (this.isEnhancedConfig(config)) {
             this.connectionManager = new ConnectionManager(config.sip);
@@ -57,6 +62,30 @@ export class VoiceAgent extends EventEmitter {
                 getLogger().perf.warn(`Severe event loop lag detected: ${lag.toFixed(2)}ms`);
             }
         });
+    }
+    getAIConfig(config) {
+        const aiConfig = config.ai || config.openai;
+        if (!aiConfig) {
+            throw new Error('AI configuration is required (either ai or openai section)');
+        }
+        const aiProvider = aiConfig.provider || 'openai';
+        const legacyApiKey = 'apiKey' in aiConfig && typeof aiConfig.apiKey === 'string'
+            ? aiConfig.apiKey
+            : undefined;
+        const openaiApiKey = aiConfig.openaiApiKey || legacyApiKey;
+        const geminiApiKey = aiConfig.geminiApiKey;
+        if (aiProvider === 'gemini' && !(geminiApiKey || openaiApiKey)) {
+            throw new Error('Gemini API key is required');
+        }
+        if (aiProvider !== 'gemini' && !openaiApiKey) {
+            throw new Error('OpenAI API key is required');
+        }
+        return {
+            ...aiConfig,
+            provider: aiProvider,
+            openaiApiKey,
+            geminiApiKey,
+        };
     }
     isEnhancedConfig(config) {
         return 'sip' in config && typeof config.sip._providerProfile !== 'undefined';

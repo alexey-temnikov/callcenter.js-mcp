@@ -12,13 +12,57 @@ export function loadConfig(configPath) {
     }
     try {
         const configData = fs.readFileSync(finalConfigPath, 'utf8');
-        const config = JSON.parse(configData);
+        const config = normalizeConfigShape(JSON.parse(configData));
         validateConfig(config);
         return config;
     }
     catch (error) {
         throw new Error(`Failed to load configuration: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+}
+function isRecord(value) {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+function getStringValue(value) {
+    return typeof value === 'string' ? value : undefined;
+}
+function getNumberValue(value) {
+    return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+export function normalizeConfigShape(rawConfig) {
+    if (!isRecord(rawConfig)) {
+        throw new Error('Configuration must be a JSON object');
+    }
+    const config = rawConfig;
+    const existingSip = isRecord(config.sip) ? config.sip : undefined;
+    if (!existingSip) {
+        config.sip = {
+            username: getStringValue(config.username) || '',
+            password: getStringValue(config.password) || '',
+            serverIp: getStringValue(config.serverIp) || '',
+            serverPort: getNumberValue(config.serverPort) || 5060,
+            localPort: getNumberValue(config.localPort) || 5060,
+            provider: getStringValue(config.provider),
+        };
+    }
+    if (isRecord(config.ai)) {
+        const aiConfig = config.ai;
+        if (!getStringValue(aiConfig.openaiApiKey) && isRecord(config.openai)) {
+            const openaiConfig = config.openai;
+            const legacyApiKey = getStringValue(openaiConfig.openaiApiKey) || getStringValue(openaiConfig.apiKey);
+            if (legacyApiKey) {
+                aiConfig.openaiApiKey = legacyApiKey;
+            }
+        }
+    }
+    if (isRecord(config.openai)) {
+        const openaiConfig = config.openai;
+        const legacyApiKey = getStringValue(openaiConfig.openaiApiKey) || getStringValue(openaiConfig.apiKey);
+        if (legacyApiKey) {
+            openaiConfig.openaiApiKey = legacyApiKey;
+        }
+    }
+    return config;
 }
 // Enhanced configuration loading with provider support
 export async function loadConfigWithProvider(configPath, options = {}) {
@@ -181,6 +225,7 @@ export function createSampleConfig(outputPath) {
             localPort: 5060
         },
         ai: {
+            provider: "openai",
             openaiApiKey: "your_openai_api_key_here",
             voice: "alloy",
             instructions: "You are a helpful AI assistant speaking on a phone call. Keep your responses concise and natural, as if you're having a real conversation."
@@ -190,6 +235,8 @@ export function createSampleConfig(outputPath) {
     getLogger().configLogs.info(`Sample configuration created at: ${outputPath}`);
 }
 function validateConfig(config) {
+    const aiConfig = config.ai || config.openai;
+    const openaiApiKey = aiConfig?.openaiApiKey || aiConfig?.apiKey;
     if (!config.sip) {
         throw new Error('Missing SIP configuration');
     }
@@ -202,10 +249,16 @@ function validateConfig(config) {
     if (!config.sip.serverIp) {
         throw new Error('Missing SIP server IP');
     }
-    if (!config.ai) {
+    if (!aiConfig) {
         throw new Error('Missing AI configuration');
     }
-    if (!config.ai.openaiApiKey) {
+    const aiProvider = aiConfig.provider || 'openai';
+    const hasOpenAIKey = !!openaiApiKey;
+    const hasGeminiKey = !!aiConfig.geminiApiKey;
+    if (aiProvider === 'gemini' && !hasGeminiKey) {
+        throw new Error('Missing Gemini API key');
+    }
+    if (aiProvider !== 'gemini' && !hasOpenAIKey) {
         throw new Error('Missing OpenAI API key');
     }
     if (!config.sip.serverPort) {
@@ -214,8 +267,11 @@ function validateConfig(config) {
     if (!config.sip.localPort) {
         config.sip.localPort = 5060;
     }
-    if (!config.ai.voice) {
+    if (config.ai && !config.ai.voice) {
         config.ai.voice = 'alloy';
+    }
+    if (config.openai && !config.openai.voice) {
+        config.openai.voice = 'alloy';
     }
 }
 // Environment override loading
@@ -358,13 +414,16 @@ export function loadConfigFromEnv() {
             username: process.env.SIP_USERNAME || '',
             password: process.env.SIP_PASSWORD || '',
             serverIp: process.env.SIP_SERVER_IP || '',
-            serverPort: parseInt(process.env.SIP_SERVER_PORT || '5060'),
-            localPort: parseInt(process.env.SIP_LOCAL_PORT || '5060')
+            serverPort: Number.parseInt(process.env.SIP_SERVER_PORT || '5060', 10),
+            localPort: Number.parseInt(process.env.SIP_LOCAL_PORT || '5060', 10)
         },
         ai: {
+            provider: process.env.AI_PROVIDER || 'openai',
             openaiApiKey: process.env.OPENAI_API_KEY || '',
-            voice: process.env.OPENAI_VOICE || 'auto',
-            instructions: process.env.OPENAI_INSTRUCTIONS
+            geminiApiKey: process.env.GEMINI_API_KEY || '',
+            model: process.env.AI_MODEL || process.env.GEMINI_MODEL,
+            voice: process.env.OPENAI_VOICE || process.env.GEMINI_VOICE || 'auto',
+            instructions: process.env.OPENAI_INSTRUCTIONS || process.env.AI_INSTRUCTIONS
         }
     };
 }

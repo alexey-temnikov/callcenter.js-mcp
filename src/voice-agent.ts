@@ -5,7 +5,7 @@ import { OpenAIClient } from "./openai-client.js";
 import { GeminiClient } from "./gemini-client.js";
 import { AIClient } from "./ai-client.js";
 import { AudioBridge } from "./audio-bridge.js";
-import { Config, CallConfig, CallEvent } from "./types.js";
+import { AIVoiceConfig, Config, CallConfig, CallEvent } from "./types.js";
 import { PerformanceMonitor } from "./performance-monitor.js";
 import { ConnectionManager } from "./connection-manager.js";
 import { getLogger } from "./logger.js";
@@ -36,7 +36,7 @@ export class VoiceAgent extends EventEmitter {
 
     // Determine if we're using enhanced configuration with ConnectionManager
     const sipConfig = config.sip;
-    const aiConfig = config.ai || config.openai;
+    const aiConfig = this.getAIConfig(config);
     
     if (!aiConfig) {
       throw new Error('AI configuration is required (either ai or openai section)');
@@ -75,6 +75,37 @@ export class VoiceAgent extends EventEmitter {
         getLogger().perf.warn(`Severe event loop lag detected: ${lag.toFixed(2)}ms`);
       }
     });
+  }
+
+  private getAIConfig(config: Config): AIVoiceConfig {
+    const aiConfig = config.ai || config.openai;
+
+    if (!aiConfig) {
+      throw new Error('AI configuration is required (either ai or openai section)');
+    }
+
+    const aiProvider = aiConfig.provider || 'openai';
+    const legacyApiKey =
+      'apiKey' in aiConfig && typeof aiConfig.apiKey === 'string'
+        ? aiConfig.apiKey
+        : undefined;
+    const openaiApiKey = aiConfig.openaiApiKey || legacyApiKey;
+    const geminiApiKey = aiConfig.geminiApiKey;
+
+    if (aiProvider === 'gemini' && !(geminiApiKey || openaiApiKey)) {
+      throw new Error('Gemini API key is required');
+    }
+
+    if (aiProvider !== 'gemini' && !openaiApiKey) {
+      throw new Error('OpenAI API key is required');
+    }
+
+    return {
+      ...aiConfig,
+      provider: aiProvider,
+      openaiApiKey,
+      geminiApiKey,
+    };
   }
 
   private isEnhancedConfig(config: Config): boolean {

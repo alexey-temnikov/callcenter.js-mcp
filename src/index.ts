@@ -6,12 +6,10 @@
  */
 
 import { VoiceAgent } from './voice-agent.js';
-import { loadConfig, loadConfigFromEnv } from './config.js';
-import { CallBriefProcessor, CallBriefError } from './call-brief-processor.js';
-import { Config, CallConfig, AIVoiceConfig } from './types.js';
+import { loadConfig } from './config.js';
+import { Config, CallConfig } from './types.js';
 import { initializeLogger, LogLevel, getLogger } from './logger.js';
-import { isValidLanguageCode } from './language-utils.js';
-import { sanitizeVoiceName } from './voice-characteristics.js';
+import { prepareCallContext, resolveRuntimeConfig } from './call-runtime.js';
 
 export interface CallOptions {
   /** Phone number to call */
@@ -114,133 +112,16 @@ export async function makeCall(options: CallOptions): Promise<CallResult> {
 
     logger.info(`Starting AI voice agent call to ${options.number}...`, 'CONFIG');
     
-    // Load configuration
-    let config: Config;
-    if (typeof options.config === 'string') {
-      try {
-        config = loadConfig(options.config);
-      } catch (error) {
-        logger.warn('Failed to load config file, trying environment variables...', 'CONFIG');
-        const envConfig = loadConfigFromEnv();
-        
-        if (!envConfig.sip?.username || !(envConfig.ai?.openaiApiKey || envConfig.ai?.geminiApiKey)) {
-          throw new Error('No valid configuration found. Either provide a config file or set environment variables.');
-        }
-        
-        config = envConfig as Config;
-      }
-    } else if (options.config) {
-      config = options.config;
-    } else {
-      // Try environment variables
-      const envConfig = loadConfigFromEnv();
-      if (!envConfig.sip?.username || !(envConfig.ai?.openaiApiKey || envConfig.ai?.geminiApiKey)) {
-        throw new Error('No configuration provided. Either provide config parameter or set environment variables.');
-      }
-      config = envConfig as Config;
-    }
-
-    // Process instructions: options.instructions > options.brief > config instructions > config brief
-    let finalInstructions: string | undefined;
-    let detectedLanguage: string | undefined;
-    let selectedVoice: string | undefined;
-    
-    // Validate and handle voice option
-    const requestedVoice = options.voice || config.ai?.voice || (config as any).openai?.voice || 'auto';
-    const validatedVoice = sanitizeVoiceName(requestedVoice);
-    
-    if (!validatedVoice) {
-      logger.warn(`Invalid voice '${requestedVoice}', defaulting to auto selection`, "CONFIG");
-    }
-    
-    const voiceToUse = validatedVoice || 'auto';
-    logger.info(`Voice mode: ${voiceToUse}`, "CONFIG");
-    
-    if (options.instructions) {
-      finalInstructions = options.instructions;
-      logger.info('Using instructions provided via options', 'CONFIG');
-    } else if (options.brief) {
-      logger.info('Generating instructions from call brief...', 'AI');
-      try {
-        const processor = new CallBriefProcessor({
-          openaiApiKey: config.ai?.openaiApiKey || (config as any).openai?.apiKey || process.env.OPENAI_API_KEY || '',
-          defaultUserName: options.userName,
-          voice: voiceToUse
-        });
-        
-        const result = await processor.generateInstructions(
-          options.brief, 
-          options.userName,
-          voiceToUse
-        );
-        finalInstructions = result.instructions;
-        detectedLanguage = result.language;
-        selectedVoice = result.selectedVoice;
-        logger.info('Successfully generated instructions from call brief', 'AI');
-      } catch (error) {
-        if (error instanceof CallBriefError) {
-          throw new Error(`Call brief error: ${error.message}`);
-        } else {
-          throw new Error(`Failed to generate instructions: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-      }
-    } else if (config.ai?.instructions || (config as any).openai?.instructions) {
-      finalInstructions = config.ai?.instructions || (config as any).openai?.instructions;
-      logger.info('Using instructions from config', 'CONFIG');
-    } else if (config.ai?.brief || (config as any).openai?.brief) {
-      logger.info('Generating instructions from config call brief...', 'AI');
-      try {
-        const processor = new CallBriefProcessor({
-          openaiApiKey: config.ai?.openaiApiKey || (config as any).openai?.apiKey || process.env.OPENAI_API_KEY || '',
-          defaultUserName: options.userName,
-          voice: voiceToUse
-        });
-        
-        const configBrief = config.ai?.brief || (config as any).openai?.brief || '';
-        const result = await processor.generateInstructions(
-          configBrief, 
-          options.userName,
-          voiceToUse
-        );
-        finalInstructions = result.instructions;
-        detectedLanguage = result.language;
-        selectedVoice = result.selectedVoice;
-        logger.info('Successfully generated instructions from config call brief', 'AI');
-      } catch (error) {
-        if (error instanceof CallBriefError) {
-          throw new Error(`Config call brief error: ${error.message}`);
-        } else {
-          throw new Error(`Failed to generate instructions from config: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-      }
-    } else {
-      throw new Error('No instructions or brief provided. Provide instructions, brief, or set them in config file.');
-    }
-
-    // Update config with final instructions, language, and voice
-    const finalVoice = selectedVoice || (voiceToUse !== 'auto' ? voiceToUse : 'marin');
-    
-    if (config.ai) {
-      config.ai.instructions = finalInstructions;
-      config.ai.voice = finalVoice;
-      if (detectedLanguage) {
-        config.ai.language = detectedLanguage;
-        logger.info(`Detected language for transcription: ${detectedLanguage}`, "AI");
-      }
-      if (selectedVoice) {
-        logger.info(`Auto-selected voice: ${selectedVoice}`, "AI");
-      }
-    } else if ((config as any).openai) {
-      (config as any).openai.instructions = finalInstructions;
-      (config as any).openai.voice = finalVoice;
-      if (detectedLanguage) {
-        (config as any).openai.language = detectedLanguage;
-        logger.info(`Detected language for transcription: ${detectedLanguage}`, "AI");
-      }
-      if (selectedVoice) {
-        logger.info(`Auto-selected voice: ${selectedVoice}`, "AI");
-      }
-    }
+    const { config } = await prepareCallContext(
+      {
+        config: options.config,
+        instructions: options.instructions,
+        brief: options.brief,
+        userName: options.userName,
+        voice: options.voice,
+      },
+      logger
+    );
 
     // Create and initialize voice agent
     const agent = new VoiceAgent(config, { 
@@ -354,22 +235,7 @@ export async function createAgent(config: string | Config, options?: {
   enableCallRecording?: boolean;
   recordingFilename?: string;
 }): Promise<VoiceAgent> {
-  let resolvedConfig: Config;
-  
-  if (typeof config === 'string') {
-    try {
-      resolvedConfig = loadConfig(config);
-    } catch (error) {
-      const envConfig = loadConfigFromEnv();
-      if (!envConfig.sip?.username || !(envConfig.ai?.openaiApiKey || envConfig.ai?.geminiApiKey)) {
-        throw new Error('No valid configuration found');
-      }
-      resolvedConfig = envConfig as Config;
-    }
-  } else {
-    resolvedConfig = config;
-  }
-  
+  const resolvedConfig = resolveRuntimeConfig(config);
   const agent = new VoiceAgent(resolvedConfig, options);
   await agent.initialize();
   

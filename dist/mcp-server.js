@@ -10,7 +10,6 @@
  */
 import { makeCall } from './index.js';
 import { createServer } from 'http';
-import { randomBytes } from 'crypto';
 /**
  * Simple call tool for basic usage with o3 instruction generation
  */
@@ -303,10 +302,13 @@ class MCPServer {
             this.setupStdioHandling();
         }
         else {
+            if (!options?.token) {
+                throw new Error('MCP_HTTP_TOKEN is required for HTTP mode. Set via --mcp-token flag or MCP_HTTP_TOKEN environment variable.');
+            }
             this.httpOptions = {
                 host: options?.host || '0.0.0.0',
                 port: options?.port || 3001,
-                token: options?.token || randomBytes(18).toString('hex')
+                token: options.token
             };
         }
     }
@@ -428,7 +430,16 @@ class MCPServer {
             return;
         }
         let body = '';
+        let bodySize = 0;
+        const MAX_BODY_SIZE = 10 * 1024 * 1024; // 10MB limit
         req.on('data', (chunk) => {
+            bodySize += chunk.length;
+            if (bodySize > MAX_BODY_SIZE) {
+                req.destroy();
+                res.writeHead(413, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Request body too large' }));
+                return;
+            }
             body += chunk.toString();
         });
         await new Promise((resolve) => req.on('end', () => resolve()));

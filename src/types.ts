@@ -116,10 +116,16 @@ export interface AIVoiceConfig {
   language?: string; // ISO-639-1 language code for transcription
 }
 
+export interface LegacyOpenAIConfig
+  extends Omit<AIVoiceConfig, "openaiApiKey"> {
+  openaiApiKey?: string;
+  apiKey?: string;
+}
+
 export interface Config {
   sip: SIPConfig | SIPAdvancedConfig;
   ai?: AIVoiceConfig;
-  openai?: AIVoiceConfig; // For backward compatibility
+  openai?: LegacyOpenAIConfig; // For backward compatibility
   audio?: AudioConfig; // For backward compatibility
   logging?: any; // For backward compatibility
   call?: any; // For backward compatibility

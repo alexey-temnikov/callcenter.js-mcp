@@ -74,17 +74,24 @@ export interface CallConfig {
     duration?: number;
 }
 export interface AIVoiceConfig {
-    openaiApiKey: string;
+    provider?: 'openai' | 'gemini';
+    openaiApiKey?: string;
+    geminiApiKey?: string;
+    model?: string;
     voice?: string;
     instructions?: string;
     brief?: string;
     userName?: string;
     language?: string;
 }
+export interface LegacyOpenAIConfig extends Omit<AIVoiceConfig, "openaiApiKey"> {
+    openaiApiKey?: string;
+    apiKey?: string;
+}
 export interface Config {
     sip: SIPConfig | SIPAdvancedConfig;
     ai?: AIVoiceConfig;
-    openai?: AIVoiceConfig;
+    openai?: LegacyOpenAIConfig;
     audio?: AudioConfig;
     logging?: any;
     call?: any;

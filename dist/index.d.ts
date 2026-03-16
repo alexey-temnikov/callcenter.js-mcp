@@ -91,6 +91,7 @@ export declare function createAgent(config: string | Config, options?: {
 export { VoiceAgent } from './voice-agent.js';
 export { SIPClient } from './sip-client.js';
 export { OpenAIClient } from './openai-client.js';
+export { GeminiClient } from './gemini-client.js';
 export { AudioBridge } from './audio-bridge.js';
 export { loadConfig, createSampleConfig, loadConfigFromEnv } from './config.js';
 export { CallBriefProcessor, CallBriefError } from './call-brief-processor.js';

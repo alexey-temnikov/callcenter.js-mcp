@@ -632,7 +632,10 @@ export class OpenAIClient extends EventEmitter {
         if (this.isConnected)
             return;
         try {
-            const url = "wss://api.openai.com/v1/realtime?model=gpt-realtime-mini";
+            if (!this.config.openaiApiKey) {
+                throw new Error("Missing OpenAI API key");
+            }
+            const url = "wss://api.openai.com/v1/realtime?model=gpt-realtime";
             // Create WebSocket with proper authentication headers
             this.ws = new WebSocket(url, [], {
                 finishRequest: (request) => {

@@ -20,6 +20,7 @@ export declare class VoiceAgent extends EventEmitter {
         enableCallRecording?: boolean;
         recordingFilename?: string;
     });
+    private getAIConfig;
     private isEnhancedConfig;
     private setupConnectionManager;
     private getLocalIpAddress;

@@ -2,11 +2,9 @@
 import 'dotenv/config';
 import { Command } from 'commander';
 import { VoiceAgent } from './voice-agent.js';
-import { loadConfig, createSampleConfig, loadConfigFromEnv } from './config.js';
+import { loadConfig, createSampleConfig } from './config.js';
 import { initializeLogger, LogLevel } from './logger.js';
-import { CallBriefProcessor, CallBriefError } from './call-brief-processor.js';
-import { isValidLanguageCode } from './language-utils.js';
-import { sanitizeVoiceName } from './voice-characteristics.js';
+import { prepareCallContext } from './call-runtime.js';
 const program = new Command();
 program
     .name('ai-voice-agent')
@@ -54,129 +52,14 @@ program
             transcriptOnly: logLevel === LogLevel.QUIET
         });
         logger.info(`Starting AI voice agent call to ${number}...`, "CONFIG");
-        let config;
-        try {
-            config = loadConfig(options.config);
-        }
-        catch (error) {
-            logger.warn('Failed to load config file, trying environment variables...', 'CONFIG');
-            const envConfig = loadConfigFromEnv();
-            if (!envConfig.sip?.username || !envConfig.ai?.openaiApiKey) {
-                logger.error('No valid configuration found.', 'CONFIG');
-                logger.error('Either provide a config file with --config or set environment variables:', 'CONFIG');
-                logger.error('  SIP_USERNAME, SIP_PASSWORD, SIP_SERVER_IP, OPENAI_API_KEY', 'CONFIG');
-                process.exit(1);
-            }
-            config = envConfig;
-        }
-        // Process instructions: CLI instructions > CLI brief > config instructions > config brief
-        let finalInstructions;
-        let detectedLanguage;
-        let selectedVoice;
-        // Validate and sanitize voice option
-        const requestedVoice = options.voice || config.ai?.voice || config.openai?.voice || 'auto';
-        const validatedVoice = sanitizeVoiceName(requestedVoice);
-        if (!validatedVoice) {
-            logger.warn(`Invalid voice '${requestedVoice}', defaulting to auto selection`, "CONFIG");
-        }
-        const voiceToUse = validatedVoice || 'auto';
-        logger.info(`Using voice mode: ${voiceToUse}`, "CONFIG");
-        if (options.instructions) {
-            // Direct instructions provided via CLI (highest priority)
-            finalInstructions = options.instructions;
-            logger.info('Using instructions provided via --instructions', 'CONFIG');
-        }
-        else if (options.brief) {
-            // Generate instructions from CLI brief (second priority)
-            logger.info('Generating instructions from CLI call brief...', "AI");
-            try {
-                const processor = new CallBriefProcessor({
-                    openaiApiKey: config.ai?.openaiApiKey || config.openai?.apiKey || process.env.OPENAI_API_KEY || '',
-                    defaultUserName: options.userName || process.env.USER_NAME || config.ai?.userName,
-                    voice: voiceToUse
-                });
-                const result = await processor.generateInstructions(options.brief, options.userName || process.env.USER_NAME || config.ai?.userName, voiceToUse);
-                finalInstructions = result.instructions;
-                detectedLanguage = result.language;
-                selectedVoice = result.selectedVoice;
-                logger.info('Successfully generated instructions from CLI call brief', "AI");
-            }
-            catch (error) {
-                if (error instanceof CallBriefError) {
-                    logger.error(`Call brief error: ${error.message}`, "AI");
-                }
-                else {
-                    logger.error(`Failed to generate instructions: ${error instanceof Error ? error.message : 'Unknown error'}`, "AI");
-                }
-                process.exit(1);
-            }
-        }
-        else if (config.ai?.instructions || config.openai?.instructions) {
-            // Use instructions from config (third priority)
-            finalInstructions = config.ai?.instructions || config.openai?.instructions;
-            logger.info('Using instructions from config file', "CONFIG");
-        }
-        else if (config.ai?.brief || config.openai?.brief) {
-            // Generate instructions from config brief (fourth priority)
-            logger.info('Generating instructions from config call brief...', "AI");
-            try {
-                const processor = new CallBriefProcessor({
-                    openaiApiKey: config.ai?.openaiApiKey || config.openai?.apiKey || process.env.OPENAI_API_KEY || '',
-                    defaultUserName: options.userName || process.env.USER_NAME || config.ai?.userName,
-                    voice: voiceToUse
-                });
-                const configBrief = config.ai?.brief || config.openai?.brief || '';
-                const result = await processor.generateInstructions(configBrief, options.userName || process.env.USER_NAME || config.ai?.userName, voiceToUse);
-                finalInstructions = result.instructions;
-                detectedLanguage = result.language;
-                selectedVoice = result.selectedVoice;
-                logger.info('Successfully generated instructions from config call brief', "AI");
-            }
-            catch (error) {
-                if (error instanceof CallBriefError) {
-                    logger.error(`Config call brief error: ${error.message}`, "AI");
-                }
-                else {
-                    logger.error(`Failed to generate instructions from config: ${error instanceof Error ? error.message : 'Unknown error'}`, "AI");
-                }
-                process.exit(1);
-            }
-        }
-        else {
-            // No instructions or brief provided anywhere
-            logger.error('No instructions or brief provided. Use --instructions, --brief, or set instructions/brief in config file.');
-            process.exit(1);
-        }
-        // Update config with final instructions, language, and voice
-        const finalVoice = selectedVoice || (voiceToUse !== 'auto' ? voiceToUse : 'marin');
-        if (config.ai) {
-            config.ai.instructions = finalInstructions;
-            config.ai.voice = finalVoice;
-            if (detectedLanguage && isValidLanguageCode(detectedLanguage)) {
-                config.ai.language = detectedLanguage;
-                logger.info(`Detected language for transcription: ${detectedLanguage}`, "AI");
-            }
-            else if (detectedLanguage) {
-                logger.warn(`Invalid detected language '${detectedLanguage}' - Whisper will auto-detect`, "AI");
-            }
-            if (selectedVoice) {
-                logger.info(`Auto-selected voice: ${selectedVoice}`, "AI");
-            }
-        }
-        else if (config.openai) {
-            config.openai.instructions = finalInstructions;
-            config.openai.voice = finalVoice;
-            if (detectedLanguage && isValidLanguageCode(detectedLanguage)) {
-                config.openai.language = detectedLanguage;
-                logger.info(`Detected language for transcription: ${detectedLanguage}`, "AI");
-            }
-            else if (detectedLanguage) {
-                logger.warn(`Invalid detected language '${detectedLanguage}' - Whisper will auto-detect`, "AI");
-            }
-            if (selectedVoice) {
-                logger.info(`Auto-selected voice: ${selectedVoice}`, "AI");
-            }
-        }
+        const { config } = await prepareCallContext({
+            config: options.config,
+            instructions: options.instructions,
+            brief: options.brief,
+            userName: options.userName,
+            voice: options.voice,
+            envUserName: process.env.USER_NAME,
+        }, logger);
         const agent = new VoiceAgent(config, {
             enableCallRecording: options.record !== undefined,
             recordingFilename: options.record === true ? undefined : options.record
