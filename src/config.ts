@@ -14,6 +14,7 @@ import {
   detectProviderFromDomain, 
   getAvailableProviders 
 } from './providers/profiles.js';
+import { formatConfigSchemaError, normalizedConfigSchema } from './config-schema.js';
 
 // Legacy function - maintained for backward compatibility
 export function loadConfig(configPath?: string): Config {
@@ -305,25 +306,18 @@ export function createSampleConfig(outputPath: string): void {
   getLogger().configLogs.info(`Sample configuration created at: ${outputPath}`);
 }
 
-function validateConfig(config: any): void {
-  const aiConfig = config.ai || config.openai;
+function validateConfig(config: Config): void {
+  const parseResult = normalizedConfigSchema.safeParse(config);
+
+  if (!parseResult.success) {
+    throw new Error(formatConfigSchemaError(parseResult.error));
+  }
+
+  const parsedConfig = parseResult.data;
+  Object.assign(config, parsedConfig);
+
+  const aiConfig = parsedConfig.ai || parsedConfig.openai;
   const openaiApiKey = aiConfig?.openaiApiKey || aiConfig?.apiKey;
-
-  if (!config.sip) {
-    throw new Error('Missing SIP configuration');
-  }
-
-  if (!config.sip.username) {
-    throw new Error('Missing SIP username');
-  }
-
-  if (!config.sip.password) {
-    throw new Error('Missing SIP password');
-  }
-
-  if (!config.sip.serverIp) {
-    throw new Error('Missing SIP server IP');
-  }
 
   if (!aiConfig) {
     throw new Error('Missing AI configuration');
@@ -341,20 +335,12 @@ function validateConfig(config: any): void {
     throw new Error('Missing OpenAI API key');
   }
 
-  if (!config.sip.serverPort) {
-    config.sip.serverPort = 5060;
+  if (parsedConfig.ai && !parsedConfig.ai.voice) {
+    parsedConfig.ai.voice = 'alloy';
   }
 
-  if (!config.sip.localPort) {
-    config.sip.localPort = 5060;
-  }
-
-  if (config.ai && !config.ai.voice) {
-    config.ai.voice = 'alloy';
-  }
-
-  if (config.openai && !config.openai.voice) {
-    config.openai.voice = 'alloy';
+  if (parsedConfig.openai && !parsedConfig.openai.voice) {
+    parsedConfig.openai.voice = 'alloy';
   }
 }
 

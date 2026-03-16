@@ -3,6 +3,7 @@ import * as path from 'path';
 import { ConfigurationError } from './types.js';
 import { getLogger } from './logger.js';
 import { getProviderProfile, detectProviderFromDomain } from './providers/profiles.js';
+import { formatConfigSchemaError, normalizedConfigSchema } from './config-schema.js';
 // Legacy function - maintained for backward compatibility
 export function loadConfig(configPath) {
     const defaultConfigPath = path.join(process.cwd(), 'config.json');
@@ -235,20 +236,14 @@ export function createSampleConfig(outputPath) {
     getLogger().configLogs.info(`Sample configuration created at: ${outputPath}`);
 }
 function validateConfig(config) {
-    const aiConfig = config.ai || config.openai;
+    const parseResult = normalizedConfigSchema.safeParse(config);
+    if (!parseResult.success) {
+        throw new Error(formatConfigSchemaError(parseResult.error));
+    }
+    const parsedConfig = parseResult.data;
+    Object.assign(config, parsedConfig);
+    const aiConfig = parsedConfig.ai || parsedConfig.openai;
     const openaiApiKey = aiConfig?.openaiApiKey || aiConfig?.apiKey;
-    if (!config.sip) {
-        throw new Error('Missing SIP configuration');
-    }
-    if (!config.sip.username) {
-        throw new Error('Missing SIP username');
-    }
-    if (!config.sip.password) {
-        throw new Error('Missing SIP password');
-    }
-    if (!config.sip.serverIp) {
-        throw new Error('Missing SIP server IP');
-    }
     if (!aiConfig) {
         throw new Error('Missing AI configuration');
     }
@@ -261,17 +256,11 @@ function validateConfig(config) {
     if (aiProvider !== 'gemini' && !hasOpenAIKey) {
         throw new Error('Missing OpenAI API key');
     }
-    if (!config.sip.serverPort) {
-        config.sip.serverPort = 5060;
+    if (parsedConfig.ai && !parsedConfig.ai.voice) {
+        parsedConfig.ai.voice = 'alloy';
     }
-    if (!config.sip.localPort) {
-        config.sip.localPort = 5060;
-    }
-    if (config.ai && !config.ai.voice) {
-        config.ai.voice = 'alloy';
-    }
-    if (config.openai && !config.openai.voice) {
-        config.openai.voice = 'alloy';
+    if (parsedConfig.openai && !parsedConfig.openai.voice) {
+        parsedConfig.openai.voice = 'alloy';
     }
 }
 // Environment override loading
