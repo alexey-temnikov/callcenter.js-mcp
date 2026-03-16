@@ -49,7 +49,8 @@
     "build:no-g722": "ENABLE_G722=0 npm run build:native && (npm run build:wasm || true) && npm run build:ts",
     "start": "npm run build && node dist/cli.js",
     "dev": "node --loader ts-node/esm src/cli.ts",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "test:codecs": "npm run build && node test-codecs.js",
     "validate": "npm run build && node scripts/validate-config.js",
     "validate:detailed": "npm run validate -- --detailed --network",
@@ -96,6 +97,7 @@
   },
   "devDependencies": {
     "@types/wav": "^1.0.4",
-    "node-gyp": "^11.4.2"
+    "node-gyp": "^11.4.2",
+    "vitest": "^4.1.0"
   }
 }
