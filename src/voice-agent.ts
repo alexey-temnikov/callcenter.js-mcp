@@ -2,6 +2,8 @@ import { EventEmitter } from "events";
 import { networkInterfaces } from "os";
 import { SIPClient } from "./sip-client.js";
 import { OpenAIClient } from "./openai-client.js";
+import { GeminiClient } from "./gemini-client.js";
+import { AIClient } from "./ai-client.js";
 import { AudioBridge } from "./audio-bridge.js";
 import { Config, CallConfig, CallEvent } from "./types.js";
 import { PerformanceMonitor } from "./performance-monitor.js";
@@ -10,7 +12,7 @@ import { getLogger } from "./logger.js";
 
 export class VoiceAgent extends EventEmitter {
   private sipClient: SIPClient;
-  private openaiClient: OpenAIClient;
+  private openaiClient: AIClient;
   private audioBridge: AudioBridge;
   private config: Config;
   private connectionManager?: ConnectionManager;
@@ -41,7 +43,12 @@ export class VoiceAgent extends EventEmitter {
     }
     
     this.sipClient = new SIPClient(sipConfig, this.handleSipEvent.bind(this));
-    this.openaiClient = new OpenAIClient(aiConfig);
+    const aiProvider = aiConfig.provider || "openai";
+    this.openaiClient = aiProvider === "gemini"
+      ? new GeminiClient(aiConfig)
+      : new OpenAIClient(aiConfig);
+
+    getLogger().ai.info(`Using AI provider: ${aiProvider}`, "AI");
     
     // Initialize ConnectionManager if using enhanced config
     if (this.isEnhancedConfig(config)) {

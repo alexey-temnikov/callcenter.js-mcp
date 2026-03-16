@@ -123,7 +123,7 @@ export async function makeCall(options: CallOptions): Promise<CallResult> {
         logger.warn('Failed to load config file, trying environment variables...', 'CONFIG');
         const envConfig = loadConfigFromEnv();
         
-        if (!envConfig.sip?.username || !envConfig.ai?.openaiApiKey) {
+        if (!envConfig.sip?.username || !(envConfig.ai?.openaiApiKey || envConfig.ai?.geminiApiKey)) {
           throw new Error('No valid configuration found. Either provide a config file or set environment variables.');
         }
         
@@ -134,7 +134,7 @@ export async function makeCall(options: CallOptions): Promise<CallResult> {
     } else {
       // Try environment variables
       const envConfig = loadConfigFromEnv();
-      if (!envConfig.sip?.username || !envConfig.ai?.openaiApiKey) {
+      if (!envConfig.sip?.username || !(envConfig.ai?.openaiApiKey || envConfig.ai?.geminiApiKey)) {
         throw new Error('No configuration provided. Either provide config parameter or set environment variables.');
       }
       config = envConfig as Config;
@@ -361,7 +361,7 @@ export async function createAgent(config: string | Config, options?: {
       resolvedConfig = loadConfig(config);
     } catch (error) {
       const envConfig = loadConfigFromEnv();
-      if (!envConfig.sip?.username || !envConfig.ai?.openaiApiKey) {
+      if (!envConfig.sip?.username || !(envConfig.ai?.openaiApiKey || envConfig.ai?.geminiApiKey)) {
         throw new Error('No valid configuration found');
       }
       resolvedConfig = envConfig as Config;
@@ -380,6 +380,7 @@ export async function createAgent(config: string | Config, options?: {
 export { VoiceAgent } from './voice-agent.js';
 export { SIPClient } from './sip-client.js';
 export { OpenAIClient } from './openai-client.js';
+export { GeminiClient } from './gemini-client.js';
 export { AudioBridge } from './audio-bridge.js';
 
 // Configuration utilities
